@@ -1,0 +1,11 @@
+resource,weight,baseline
+Food,2.0,675.2
+Housing,1.0,0.29
+MetallicElements,1.3,0.375
+Timber,1.2,0.5
+MetallicAlloys,1.5,0.219
+Electronics,0.8,7.3
+Water,0.5,580
+PotentialFossilEnergyUsable,1.0,79
+PotentialRenewableEnergyUsable,1.0,21394
+FoodWaste,-1.0,74
