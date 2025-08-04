@@ -61,7 +61,6 @@ Along the way, you’ll see how I translated the assignment spec into clean, abs
    pip install -r requirements.txt
    ```
 
-   *(Dependencies: `python-pptx` for slide generation, standard library modules for everything else.)*
 
 ---
 
