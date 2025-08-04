@@ -36,7 +36,7 @@ Along the way, you’ll see how I translated the assignment spec into clean, abs
 │   ├── actions.py              # TransformAction, TransferAction
 │   ├── search.py               # Beam‐search engine (utility‐driven)
 │   └── part2.py                # CLI driver: country_scheduler(…)
-├── TalkSlides.pptx             # Slides for Part 2 video presentation
+├── Part2.pptx                  # Slides for Part 2 video presentation
 ├── VideoLink.txt               # Private link to my narrated demo
 └── README.md                   # ← you are here
 ```
@@ -71,17 +71,7 @@ Along the way, you’ll see how I translated the assignment spec into clean, abs
 
 ```bash
 cd part1
-python main.py \
-  --world ../data/init_world.csv \
-  --templates ../transform_templates/core.tpl \
-  --weights ../data/weights.csv \
-  --self Atlantis \
-  --max-depth 6 \
-  --beam-width 50 \
-  --gamma 0.9 \
-  --failure-cost -10 \
-  --k 1.0 \
-  --x0 0
+python main.py --world data/init_world.csv --templates transform_templates/core.tpl --weights data/weights.csv --self Atlantis
 ```
 
 * **Output:**
@@ -97,18 +87,7 @@ python main.py \
 
 ```bash
 cd part2
-python part2.py Atlantis \
-  ../data/weights.csv \
-  ../data/init_world.csv \
-  ../transform_templates/core.tpl \
-  output_schedules_case1.csv \
-  --n 5 \
-  --depth 6 \
-  --beam 200 \
-  --gamma 0.98 \
-  --cost -5 \
-  --k 1.0 \
-  --x0 0
+python part2.py Atlantis data/weights.csv data/init_world.csv transform_templates/core.tpl output_schedules.csv --n 5 --depth 5 --beam 50 --gamma 0.98 --cost -5 --k 1.0 --x0 0
 ```
 
 * **Arguments:**
