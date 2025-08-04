@@ -11,7 +11,6 @@ from parse_templates import load_templates, TransformTemplate
 from state_quality import StateQuality
 from metrics import expected_utility
 from schedule import Schedule, Action
-from actions import TransferAction
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +31,7 @@ def country_scheduler(
 ):
     """
     Anytime, forward‐searching, depth‐bounded, utility‐driven scheduler.
-    Writes the top `num_output_schedules` schedules (with per-step EU) to the output file.
+    Writes the top num_output_schedules schedules (with per-step EU) to the output file.
     """
     # 1) Load data
     logger.info("Loading world state…")
@@ -84,42 +83,33 @@ def country_scheduler(
 
         # Generate successors (forward, singleton TRANSFER & TRANSFORM)
         for act in wstate.legal_actions(your_country, templates):
-                # —— A) FILTER 1: no back-to-back identical actions —— 
-                if sched.actions and act == sched.actions[-1]:
-                    continue
+            # 1) build the new schedule
+            new_sched = sched.extend(act)
 
-                # build the new candidate schedule
-                new_sched = sched.extend(act)
+            # 2) ask the metrics code to apply exactly this one extra action on a copy
+            try:
+                eu_new = expected_utility(
+                    schedule=new_sched,
+                    world=wstate,            # pass the *old* world
+                    self_country=your_country,
+                    gamma=gamma,
+                    failure_cost=failure_cost,
+                    k=k,
+                    x0=x0,
+            )
+            except ValueError:
+                # if it fails (e.g. not enough inputs) skip it
+                continue
 
-                # compute the EU if we did this action
-                try:
-                    eu_new = expected_utility(
-                        schedule=new_sched,
-                        world=wstate,
-                        self_country=your_country,
-                        gamma=gamma,
-                        failure_cost=failure_cost,
-                        k=k,
-                        x0=x0
-                    )
-                except ValueError:
-                    # not enough resources / invalid, skip
-                    continue
+            # 3) now construct the successor world once  
+            new_world = wstate.copy()
+            new_world.apply_action(act)
 
-                # —— B) FILTER 2: skip if intermediate EU is too bad —— 
-                # for example, don’t let EU drop below -2.0 at any intermediate step
-                if eu_new < -2.0:
-                    continue
-
-                # now actually apply it once
-                new_world = wstate.copy()
-                new_world.apply_action(act)
-
-                new_eus = eus + [eu_new]
-                heapq.heappush(
-                    frontier,
-                    (-eu_new, next(counter), new_sched, new_world, new_eus)
-                )
+            new_eus = eus + [eu_new]
+            heapq.heappush(
+                frontier,
+                (-eu_new, next(counter), new_sched, new_world, new_eus)
+        )
         # 4) If we have enough completed schedules, stop
         if len(frontier) > frontier_max_size:
             # keep only top‐beam items
