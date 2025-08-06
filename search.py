@@ -1,6 +1,8 @@
 # search.py
 import heapq
 import logging
+import itertools
+
 from typing import List, Tuple, Dict, Any
 
 from world import World
@@ -46,8 +48,10 @@ class SearchEngine:
             k=self.logistic_k,
             x0=self.logistic_x0
         )
-        final_world = sched.apply(world)
+        # apply on a copy so we don't mutate the original
+        final_world = sched.apply(world.copy())
         return sched, final_world, best_eu
+
 
 
 def best_schedule(
@@ -65,8 +69,9 @@ def best_schedule(
     Returns (best_schedule, best_eu).
     """
 
-    # Priority queue of (-EU, WorldState, Schedule)
-    frontier: List[Tuple[float, World, Schedule]] = []
+    # Priority queue entries: (-EU, counter, Schedule, World)
+    frontier: List[Tuple[float, int, Schedule, World]] = []
+    counter = itertools.count()
 
     # 1) Utility of doing nothing
     empty_sched = Schedule([])
@@ -79,16 +84,16 @@ def best_schedule(
         k=k,
         x0=x0
     )
-    heapq.heappush(frontier, (-start_eu, initial_world.copy(), empty_sched))
+    heapq.heappush(frontier, (-start_eu, next(counter), empty_sched, initial_world.copy()))
 
-    visited: Dict[Tuple[Any,int], float] = {}
+    visited: Dict[Tuple[Any, int], float] = {}
     best_sched = empty_sched
     best_eu    = start_eu
     logger.info(f"Initial EU for {self_country}: {start_eu:.4f}")
 
     # 2) Expand frontier
     while frontier:
-        neg_eu, world_state, sched = heapq.heappop(frontier)
+        neg_eu, _, sched, world_state = heapq.heappop(frontier)
         current_eu = -neg_eu
 
         # Update best
@@ -103,26 +108,42 @@ def best_schedule(
 
         # Generate next actions
         for action in world_state.legal_actions(self_country, transforms):
-            next_world = world_state.copy()
+            next_sched = sched.extend(action)
+
+            # IMPORTANT: score this child against the *parent* world_state.
+            # expected_utility will apply the whole schedule internally,
+            # so passing next_world would double-apply the last action.
             try:
-                next_world.apply_action(action)
-            except Exception:
+                eu_val = expected_utility(
+                    schedule=next_sched,
+                    world=world_state,            # parent world
+                    self_country=self_country,
+                    gamma=gamma,
+                    failure_cost=failure_cost,
+                    k=k,
+                    x0=x0
+                )
+            except ValueError as e:
+                # Illegal / non-executable schedule; skip
+                logger.debug(f"Skip illegal child {action}: {e}")
                 continue
 
-            next_sched = sched.extend(action)
-            eu_val = expected_utility(
-                schedule=next_sched,
-                world=next_world,
-                self_country=self_country,
-                gamma=gamma,
-                failure_cost=failure_cost,
-                k=k,
-                x0=x0
-            )
+            # Now build the successor world once (no double-apply)
+            try:
+                next_world = world_state.copy()
+                next_world.apply_action(action)
+            except Exception as e:
+                logger.debug(f"Apply failed for {action}: {e}")
+                continue
 
             key = (next_world.signature(), len(next_sched.actions))
             if visited.get(key, float('-inf')) < eu_val:
                 visited[key] = eu_val
-                heapq.heappush(frontier, (-eu_val, next_world, next_sched))
+                heapq.heappush(frontier, (-eu_val, next(counter), next_sched, next_world))
+
+        # Beam prune (optional but recommended)
+        if len(frontier) > 0 and len(frontier) > 50:  # safety valve if you want
+            frontier = heapq.nsmallest(50, frontier)
+            heapq.heapify(frontier)
 
     return best_sched, best_eu
